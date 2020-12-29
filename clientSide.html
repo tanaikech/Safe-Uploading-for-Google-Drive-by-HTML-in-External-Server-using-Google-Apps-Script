@@ -1,0 +1,61 @@
+<script src="https://cdn.jsdelivr.net/gh/tanaikech/ResumableUploadForGoogleDrive_js@master/resumableupload_js.min.js"></script>
+
+<body>
+  <form>
+    <input name="file" id="uploadfile" type="file" />
+  </form>
+  <div id="progress"></div>
+</body>
+
+<script>
+  document.getElementById("uploadfile").addEventListener("change", run, false);
+
+  function run(obj) {
+    const file = obj.target.files[0];
+    if (file.name != "") {
+      let fr = new FileReader();
+      fr.fileName = file.name;
+      fr.fileSize = file.size;
+      fr.fileType = file.type;
+      fr.readAsArrayBuffer(file);
+      fr.onload = resumableUpload;
+    }
+  }
+
+  async function resumableUpload(e) {
+    const webAppsUrl = "https://script.google.com/macros/s/###/exec"; // <--- Please set the URL of the deployed Web Apps.
+
+    const url = `${webAppsUrl}?key=sampleKey&work=start`;
+    const obj = JSON.parse(atob(await fetch(url).then((res) => res.text())));
+    document.getElementById("progress").innerHTML = "Initializing.";
+    const f = e.target;
+    const resource = {
+      fileName: f.fileName,
+      fileSize: f.fileSize,
+      fileType: f.fileType,
+      fileBuffer: f.result,
+      folderId: obj.folderId,
+      accessToken: obj.accessToken,
+    };
+    const ru = new ResumableUploadToGoogleDrive();
+    ru.Do(resource, async (res, err) => {
+      if (err) {
+        console.log(err);
+        return;
+      }
+      let msg = "";
+      if (res.status == "Uploading") {
+        msg =
+          Math.round(
+            (res.progressNumber.current / res.progressNumber.end) * 100
+          ) + "%";
+      } else if (res.status == "Done") {
+        const url = `${webAppsUrl}?key=sampleKey&work=end&fileId=${res.result.id}`;
+        msg = await fetch(url)
+          .then((r) => r.text())
+          .catch((e) => console.log(e)); // When you can see "Done." at the console, it indicates that the process was finished.
+      }
+      document.getElementById("progress").innerText = msg;
+    });
+  }
+</script>
